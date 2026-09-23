@@ -1,0 +1,84 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: capstone
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Africa/Nairobi"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+
+          containers:
+            - name: backup
+              image: postgres:16
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  umask 077
+
+                  FILE="/backups/capstone-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                  echo "Creating backup: $FILE"
+
+                  pg_dump \
+                    -h "$DB_HOST" \
+                    -p "$DB_PORT" \
+                    -U "$DB_USER" \
+                    -d "$DB_NAME" \
+                    -Fc \
+                    -f "$FILE"
+
+                  pg_restore --list "$FILE" > /dev/null
+                  echo "Backup archive validated."
+
+                  find /backups -type f \
+                    -name 'capstone-*.dump' \
+                    -mtime +6 -delete
+
+                  echo "Backup completed successfully."
+
+              envFrom:
+                - configMapRef:
+                    name: postgres-config
+
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-credentials
+                      key: DB_PASSWORD
+
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backups
+
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: postgres-backups

@@ -16,6 +16,9 @@ spec:
     spec:
       serviceAccountName: capstone-api
       automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

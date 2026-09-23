@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: capstone-db-migration-001
+  namespace: capstone
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: migration
+          image: postgres:16
+
+          command:
+            - sh
+            - -c
+            - |
+              psql \
+                -v ON_ERROR_STOP=1 \
+                -h "$DB_HOST" \
+                -p "$DB_PORT" \
+                -U "$DB_USER" \
+                -d "$DB_NAME" \
+                -f /migrations/001_add_task_description.sql
+
+          envFrom:
+            - configMapRef:
+                name: postgres-config
+
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_PASSWORD
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+
+      volumes:
+        - name: migrations
+          configMap:
+            name: capstone-db-migrations

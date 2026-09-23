@@ -1,0 +1,45 @@
+name: Capstone API CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Validate JavaScript syntax
+        working-directory: api
+        run: |
+          node --check src/index.js
+          node --check src/db.js
+          node --check src/migrate.js
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: helm lint ./helm/capstone-api
+
+      - name: Validate Helm templates
+        run: helm template capstone ./helm/capstone-api
