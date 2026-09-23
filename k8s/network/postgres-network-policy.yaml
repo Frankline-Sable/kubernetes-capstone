@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-postgres
+  namespace: capstone
+spec:
+  podSelector:
+    matchLabels:
+      app: capstone-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: capstone-api
+      ports:
+        - protocol: TCP
+          port: 5432
+
+
+
+    - from:
+        - podSelector:
+            matchLabels:
+              app: capstone-api
+        - podSelector:
+            matchLabels:
+              app: postgres-backup
+      ports:
+        - protocol: TCP
+          port: 5432

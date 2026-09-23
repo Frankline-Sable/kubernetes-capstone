@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: capstone-api
-  tag: v1
+  tag: v2
   pullPolicy: Never
 
 service:

@@ -50,6 +50,16 @@ app.post("/tasks", async (req, res) => {
   }
 });
 
+app.get("/load", (_req, res) => {
+  const end = Date.now() + 500;
+
+  while (Date.now() < end) {
+    Math.sqrt(Math.random());
+  }
+
+  res.json({ message: "CPU load completed" });
+});
+
 const port = Number(process.env.PORT || 3000);
 
 app.listen(port, "0.0.0.0", () => {
