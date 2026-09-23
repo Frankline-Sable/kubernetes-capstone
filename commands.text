@@ -1,0 +1,28 @@
+kubectl apply -f namespace.yaml
+
+kubectl get namespaces
+
+kubectl get pods -n capstone
+
+kubectl apply -f k8s/database/services.yaml
+kubectl apply -f k8s/database/statefulset.yaml
+
+kubectl rollout status statefulset/postgres -n capstone
+kubectl get pods,pvc,svc -n capstone
+
+we create password using kubectl
+kubectl create secret generic postgres-credentials \
+  --namespace capstone \
+  --from-literal=DB_PASSWORD='sable503'
+
+
+kubectl apply -f k8s/database/configmap.yaml
+
+
+kubectl apply -f k8s/database/configmap.yaml
+
+kubectl get configmap,secret -n capstone
+
+
+kubectl exec -it postgres-0 -n capstone -- \
+  psql -U capstone_user -d capstone_db

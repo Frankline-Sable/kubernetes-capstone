@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: capstone
+spec:
+  clusterIP: None
+  selector:
+    app: capstone-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: capstone
+spec:
+  type: ClusterIP
+  selector:
+    app: capstone-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
