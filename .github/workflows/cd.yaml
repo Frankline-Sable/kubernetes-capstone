@@ -1,0 +1,22 @@
+name: Capstone CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-runner:
+    name: Test Minikube access
+    runs-on: [self-hosted, macOS, ARM64]
+
+    steps:
+      - name: Check Kubernetes connection
+        run: kubectl --context=minikube get nodes
+
+      - name: Check Helm
+        run: helm version --short
+
+      - name: Check capstone namespace
+        run: kubectl --context=minikube get pods -n capstone
