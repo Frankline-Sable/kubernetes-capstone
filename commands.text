@@ -26,3 +26,13 @@ kubectl get configmap,secret -n capstone
 
 kubectl exec -it postgres-0 -n capstone -- \
   psql -U capstone_user -d capstone_db
+
+
+  helm upgrade --install capstone \
+  ./helm/capstone-api \
+  --kube-context minikube \
+  -n capstone \
+  --set image.repository=ghcr.io/frankline-sable/kubernetes-capstone \
+  --set image.tag="$(git rev-parse HEAD)" \
+  --wait \
+  --timeout 5m
