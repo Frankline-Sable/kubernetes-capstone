@@ -1,9 +1,9 @@
 replicaCount: 2
 
 image:
-  repository: capstone-api
-  tag: v2
-  pullPolicy: Never
+  repository: ghcr.io/frankline-sable/kubernetes-capstone
+  tag: latest
+  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
