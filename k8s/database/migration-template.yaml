@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: capstone-migration-template
+  namespace: capstone
+spec:
+  schedule: "0 0 1 1 *"
+  suspend: true
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+
+          containers:
+            - name: migration
+              image: ghcr.io/frankline-sable/kubernetes-capstone:latest
+              imagePullPolicy: Always
+
+              command:
+                - node
+                - src/migrate.js
+
+              envFrom:
+                - configMapRef:
+                    name: postgres-config
+                - secretRef:
+                    name: postgres-credentials
+
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL

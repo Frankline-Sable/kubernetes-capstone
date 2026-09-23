@@ -1,22 +1,105 @@
 name: Capstone CD
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Capstone API CI"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: capstone-deployment
+  cancel-in-progress: false
+
 jobs:
-  test-runner:
-    name: Test Minikube access
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+
     runs-on: [self-hosted, macOS, ARM64]
 
+    timeout-minutes: 20
+
     steps:
-      - name: Check Kubernetes connection
-        run: kubectl --context=minikube get nodes
+      - name: Checkout published commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
 
-      - name: Check Helm
-        run: helm version --short
+      - name: Verify cluster access
+        run: |
+          kubectl --context=minikube get nodes
 
-      - name: Check capstone namespace
-        run: kubectl --context=minikube get pods -n capstone
+      - name: Run database migrations
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          JOB_NAME="capstone-migrate-${IMAGE_TAG:0:12}-${RUN_ID}"
+
+          kubectl --context=minikube create job \
+            "$JOB_NAME" \
+            --from=cronjob/capstone-migration-template \
+            -n capstone \
+            --dry-run=client \
+            -o json |
+          kubectl --context=minikube set image \
+            -f - \
+            migration="ghcr.io/frankline-sable/kubernetes-capstone:${IMAGE_TAG}" \
+            --local \
+            -o yaml |
+          kubectl --context=minikube apply -f -
+
+          if ! kubectl --context=minikube wait \
+            --for=condition=complete \
+            "job/$JOB_NAME" \
+            -n capstone \
+            --timeout=300s; then
+
+            kubectl --context=minikube logs \
+              "job/$JOB_NAME" -n capstone \
+              --all-containers=true || true
+
+            exit 1
+          fi
+
+          kubectl --context=minikube logs \
+            "job/$JOB_NAME" -n capstone
+
+      - name: Deploy application with Helm
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          helm upgrade --install capstone \
+            ./helm/capstone-api \
+            --kube-context minikube \
+            -n capstone \
+            --set image.repository=ghcr.io/frankline-sable/kubernetes-capstone \
+            --set image.tag="$IMAGE_TAG" \
+            --set image.pullPolicy=Always \
+            --wait \
+            --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          kubectl --context=minikube rollout status \
+            deployment/capstone-api \
+            -n capstone \
+            --timeout=120s
+
+          kubectl --context=minikube get pods \
+            -n capstone \
+            -l app=capstone-api
+
+          kubectl --context=minikube get deployment \
+            capstone-api \
+            -n capstone \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
